@@ -1,5 +1,6 @@
 {
   "name": "store-manager-frontend",
+  "homepage": "https://FabricioIaronka.github.io/store-manager-frontend/",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -7,7 +8,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy":"gh-pages -d dist"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.11",
@@ -15,6 +18,7 @@
     "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
     "bootswatch": "^5.3.8",
+    "gh-pages": "^6.3.0",
     "react": "^19.2.0",
     "react-bootstrap": "^2.10.10",
     "react-dom": "^19.2.0",
