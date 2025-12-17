@@ -6,17 +6,12 @@ export const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('store_token');
     const activeStoreId = localStorage.getItem('active_store_id');
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
     if (activeStoreId) {
       config.headers['x-store-id'] = activeStoreId;
     }
@@ -33,9 +28,10 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response && error.response.status === 401) {
-      localStorage.removeItem('store_token');
-      window.location.href = '/'; 
+    const isCheckAuth = error.config.url.includes('/auth/me');
+
+    if (error.response?.status === 401 && !isCheckAuth) {
+       window.location.href = '/'; 
     }
     return Promise.reject(error);
   }

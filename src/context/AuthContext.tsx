@@ -28,20 +28,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('store_token');
-    const storedUser = localStorage.getItem('store_user');
-    const storedStoreId = localStorage.getItem('active_store_id');
+    const checkAuth = async () => {
+      try {
+        const storedStoreId = localStorage.getItem('active_store_id');
+        if (storedStoreId) setActiveStoreId(storedStoreId);
 
-    if (storedToken && storedUser) {
-      api.defaults.headers.Authorization = `Bearer ${storedToken}`;
-      setUser(JSON.parse(storedUser));
-    }
+        const { data } = await api.get('/auth/me');
+        setUser(data);
+      } catch (error) {
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    if (storedStoreId) {
-      setActiveStoreId(storedStoreId);
-    }
-    
-    setLoading(false);
+    checkAuth();
   }, []);
 
   const signIn = useCallback(async (email: string, pass: string) => {
@@ -49,44 +50,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     formData.append('username', email); 
     formData.append('password', pass);
 
-    const response = await api.post('/auth/login', formData, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded'
-      }
+    await api.post('/auth/login', formData, {
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
 
-    const { access_token } = response.data;
+    const userResponse = await api.get('/auth/me');
+    const userData = userResponse.data;
 
-    localStorage.setItem('store_token', access_token);
-    api.defaults.headers.Authorization = `Bearer ${access_token}`;
-
-    try {
-      const userResponse = await api.get('/auth/me');
-      const userData = userResponse.data;
-
-      localStorage.setItem('store_user', JSON.stringify(userData));
-      setUser(userData);
-
-      if (userData.stores && userData.stores.length > 0) {
+    setUser(userData);
+    
+    if (userData.stores && userData.stores.length > 0) {
         const firstStoreId = String(userData.stores[0].id);
         localStorage.setItem('active_store_id', firstStoreId);
         setActiveStoreId(firstStoreId);
-      }
-      
-    } catch (error) {
-      console.error("Erro ao buscar detalhes do usuário:", error);
-      localStorage.removeItem('store_token');
-      delete api.defaults.headers.Authorization;
-      throw error;
     }
   }, []);
 
-  const signOut = useCallback(() => {
-    localStorage.removeItem('store_token');
-    localStorage.removeItem('store_user');
-    localStorage.removeItem('active_store_id');
-    setUser(null);
-    delete api.defaults.headers.Authorization; 
+  const signOut = useCallback(async () => {
+    try {
+        await api.post('/auth/logout'); 
+    } catch (error) {
+        console.error("Erro ao fazer logout no servidor", error);
+    } finally {
+        localStorage.removeItem('active_store_id');
+        setUser(null);
+        setActiveStoreId(null);
+    }
   }, []);
 
   const selectStore = useCallback((storeId: string) => {
