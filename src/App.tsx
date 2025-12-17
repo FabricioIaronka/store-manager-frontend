@@ -1,4 +1,7 @@
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import { PrivateRoute } from './components/PrivateRoute';
+
 import { MainNavbar } from './components/MainNavBar';
 import { Dashboard } from './pages/Dashboard';
 import { Produtos } from './pages/Produtos';
@@ -21,13 +24,16 @@ function Layout() {
       
       <Routes>
         <Route path="/" element={<Login />} />
-        
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/produtos" element={<Produtos />} />
-        <Route path="/clientes" element={<Clientes />} />
-        <Route path="/historico" element={<HistoricoVendas />} />
-        <Route path="/vendas" element={<Vendas />} />
-        <Route path="/perfil" element={<Perfil />} />
+
+        <Route element={<PrivateRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/produtos" element={<Produtos />} />
+          <Route path="/clientes" element={<Clientes />} />
+          <Route path="/historico" element={<HistoricoVendas />} />
+          <Route path="/vendas" element={<Vendas />} />
+          <Route path="/perfil" element={<Perfil />} />
+        </Route>
+
       </Routes>
     </>
   );
@@ -36,7 +42,9 @@ function Layout() {
 function App() {
   return (
     <BrowserRouter>
+    <AuthProvider>
       <Layout />
+    </AuthProvider>
     </BrowserRouter>
   );
 }

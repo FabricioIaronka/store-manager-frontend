@@ -1,96 +1,10 @@
 import { useState } from 'react';
-import { Container, Table, Button, Modal, Row, Col, Badge, ListGroup } from 'react-bootstrap';
+import { Container, Table, Button, Modal, Row, Col, Badge, ListGroup, Spinner, Alert } from 'react-bootstrap';
+import { useVendas, type Sale, type PaymentType } from '../hooks/useVendas';
+import { useClientes } from '../hooks/useClientes';
+import { useProdutos } from '../hooks/useProdutos';
 
-type PaymentType = 'MONEY' | 'DEBIT' | 'CREDIT' | 'PIX' | 'OTHER';
 
-interface SaleItem {
-  sale_id: number;
-  product_id: number;
-  quantity: number;
-  unit_price: number;
-}
-
-interface Sale {
-  id: number;
-  user_id: number;
-  client_id: number | null; 
-  created_at: string;
-  payment_type: PaymentType;
-  items: SaleItem[];
-  total_value: number;
-}
-
-const mockClientes = [
-  { id: 1, nome: 'João da Silva' },
-  { id: 2, nome: 'Maria Souza' },
-];
-const mockProdutos = [
-  { id: 1, name: 'Teclado Mecânico', price: 150.99 },
-  { id: 2, name: 'Mouse Gamer', price: 80.50 },
-  { id: 3, name: 'Monitor 24"', price: 800.00 },
-];
-const mockVendedores = [
-  { id: 1, nome: 'Admin Silva' },
-];
-
-const mockVendas: Sale[] = [
-  {
-    id: 1001,
-    user_id: 1,
-    client_id: 1,
-    created_at: new Date(2025, 10, 14, 14, 30).toISOString(),
-    payment_type: 'PIX',
-    items: [
-      { sale_id: 1001, product_id: 1, quantity: 1, unit_price: 150.99 },
-      { sale_id: 1001, product_id: 2, quantity: 2, unit_price: 80.50 },
-    ],
-    total_value: (150.99 + (2 * 80.50)),
-  },
-  {
-    id: 1002,
-    user_id: 1,
-    client_id: null,
-    created_at: new Date(2025, 10, 15, 10, 15).toISOString(),
-    payment_type: 'CREDIT',
-    items: [
-      { sale_id: 1002, product_id: 3, quantity: 1, unit_price: 800.00 },
-    ],
-    total_value: 800.00,
-  },
-  {
-    id: 1003,
-    user_id: 1,
-    client_id: null, 
-    created_at: new Date(2025, 10, 15, 10, 15).toISOString(),
-    payment_type: 'DEBIT',
-    items: [
-      { sale_id: 1002, product_id: 3, quantity: 1, unit_price: 800.00 },
-    ],
-    total_value: 800.00,
-  },
-  {
-    id: 1004,
-    user_id: 1,
-    client_id: null, 
-    created_at: new Date(2025, 10, 15, 10, 15).toISOString(),
-    payment_type: 'MONEY',
-    items: [
-      { sale_id: 1002, product_id: 3, quantity: 1, unit_price: 800.00 },
-    ],
-    total_value: 800.00,
-  },
-  {
-    id: 1005,
-    user_id: 1,
-    client_id: null, 
-    created_at: new Date(2025, 10, 15, 10, 15).toISOString(),
-    payment_type: 'OTHER',
-    items: [
-      { sale_id: 1002, product_id: 3, quantity: 1, unit_price: 800.00 },
-    ],
-    total_value: 800.00,
-  }
-];
 
 const formatarMoeda = (valor: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
@@ -105,9 +19,9 @@ const formatarData = (dataString: string) => {
 
 const formatarPagamento = (tipo: PaymentType) => {
   switch (tipo) {
-    case 'MONEY': return <Badge bg="success">Dinheiro</Badge>;
-    case 'DEBIT': return <Badge bg="primary">Débito</Badge>;
-    case 'CREDIT': return <Badge bg="warning" text="dark">Crédito</Badge>;
+    case 'Money': return <Badge bg="success">Dinheiro</Badge>;
+    case 'Debit': return <Badge bg="primary">Débito</Badge>;
+    case 'Credit': return <Badge bg="warning" text="dark">Crédito</Badge>;
     case 'PIX': return <Badge bg="info">PIX</Badge>;
     default: return <Badge bg="secondary">Outro</Badge>;
   }
@@ -115,17 +29,23 @@ const formatarPagamento = (tipo: PaymentType) => {
 
 export function HistoricoVendas() {
 
-  const [vendas] = useState<Sale[]>(mockVendas);
+  const { vendas, isLoading, isError } = useVendas();
+  
+  const { clientes } = useClientes();
+  const { produtos } = useProdutos();
+
   const [showModal, setShowModal] = useState(false);
   const [vendaSelecionada, setVendaSelecionada] = useState<Sale | null>(null);
 
   const getClienteNome = (id: number | null) => {
     if (id === null) return "Consumidor Final";
-    return mockClientes.find(c => c.id === id)?.nome || "Cliente não encontrado";
+    const cliente = clientes.find(c => c.id === id);
+    return cliente ? `${cliente.name} ${cliente.surname}` : `Cliente #${id}`;
   };
 
   const getProdutoNome = (id: number) => {
-    return mockProdutos.find(p => p.id === id)?.name || "Produto não encontrado";
+    const produto = produtos.find(p => p.id === id);
+    return produto ? produto.name : `Produto #${id}`;
   };
 
   const handleShowModal = (venda: Sale) => {
@@ -137,6 +57,25 @@ export function HistoricoVendas() {
     setShowModal(false);
     setVendaSelecionada(null);
   };
+
+  if (isLoading) {
+    return (
+      <Container className="text-center mt-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2">Carregando histórico...</p>
+      </Container>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Container className="mt-5">
+        <Alert variant="danger">
+          Erro ao carregar o histórico de vendas. Verifique a conexão.
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container>
@@ -156,25 +95,29 @@ export function HistoricoVendas() {
           </tr>
         </thead>
         <tbody>
-          {vendas.map((venda) => (
-            <tr key={venda.id}>
-              <td>{venda.id}</td>
-              <td>{formatarData(venda.created_at)}</td>
-              <td>{getClienteNome(venda.client_id)}</td>
-              <td>{formatarPagamento(venda.payment_type)}</td>
-              <td className="text-end">{formatarMoeda(venda.total_value)}</td>
-              <td className="text-center">
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={() => handleShowModal(venda)}
-                  title="Visualizar Detalhes"
-                >
-                  <i className="bi bi-eye-fill"></i>
-                </Button>
-              </td>
-            </tr>
-          ))}
+          {vendas.length === 0 ? (
+            <tr><td colSpan={6} className="text-center text-muted">Nenhuma venda registrada.</td></tr>
+          ) : (
+            vendas.map((venda) => (
+              <tr key={venda.id}>
+                <td>{venda.id}</td>
+                <td>{formatarData(venda.created_at)}</td>
+                <td>{getClienteNome(venda.client_id)}</td>
+                <td>{formatarPagamento(venda.payment_type)}</td>
+                <td className="text-end">{formatarMoeda(venda.total_value)}</td>
+                <td className="text-center">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleShowModal(venda)}
+                    title="Visualizar Detalhes"
+                  >
+                    <i className="bi bi-eye-fill"></i>
+                  </Button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </Table>
 
@@ -185,6 +128,7 @@ export function HistoricoVendas() {
         <Modal.Body>
           {vendaSelecionada ? (
             <>
+              {/* Informações Principais */}
               <ListGroup variant="flush" className="mb-4">
                 <ListGroup.Item>
                   <Row>
@@ -206,8 +150,8 @@ export function HistoricoVendas() {
                 </ListGroup.Item>
                 <ListGroup.Item>
                   <Row>
-                    <Col sm={3} as="strong">Vendedor:</Col>
-                    <Col>{mockVendedores.find(v => v.id === vendaSelecionada.user_id)?.nome}</Col>
+                    <Col sm={3} as="strong">Vendedor (ID):</Col>
+                    <Col>{vendaSelecionada.user_id}</Col>
                   </Row>
                 </ListGroup.Item>
                 <ListGroup.Item className="table-primary">
@@ -220,6 +164,7 @@ export function HistoricoVendas() {
                 </ListGroup.Item>
               </ListGroup>
 
+              {/* Tabela de Itens */}
               <h5 className="mt-4">Itens Inclusos</h5>
               <Table striped bordered size="sm">
                 <thead>
@@ -246,7 +191,7 @@ export function HistoricoVendas() {
             </>
           ) : (
             <p>Carregando detalhes da venda...</p>
-          )}
+          )}  
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={handleCloseModal}>

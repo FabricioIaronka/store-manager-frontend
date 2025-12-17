@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export function Login() {
   const navigate = useNavigate();
+  const { signIn } = useAuth();
+
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
@@ -22,19 +25,20 @@ export function Login() {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro('');
     setCarregando(true);
 
-    setTimeout(() => {
-      if (email === 'admin@admin.com' && senha === '123456') {
-        navigate('/dashboard');
-      } else {
-        setErro('E-mail ou senha inválidos.');
-        setCarregando(false);
-      }
-    }, 1000);
+    try {
+      await signIn(email, senha);
+      
+      navigate('/dashboard');
+    } catch (error) {
+      console.error(error);
+      setErro('E-mail ou senha inválidos.');
+      setCarregando(false);
+    }
   };
 
   return (

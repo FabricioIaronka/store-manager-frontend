@@ -1,12 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { Container, Card, Form, Button, Row, Col, Alert } from 'react-bootstrap';
-
-
-const mockUsuarioLogado = {
-    id: 1,
-    nome: "Admin Silva",
-    email: "admin@admin.com"
-};
+import { useAuth } from '../context/AuthContext';
 
 interface Loja {
     id: number;
@@ -15,30 +9,53 @@ interface Loja {
     endereco: string;
 }
 
-const mockLojasDoUsuario: Loja[] = [
-    { id: 1, nome: "Loja Matriz", cnpj: "00.111.222/0001-01", endereco: "Rua Principal, 123, Centro" },
-    { id: 2, nome: "Filial Bairro", cnpj: "00.111.222/0002-02", endereco: "Av. dos Bairros, 456" },
-];
-
 export function Perfil() {
+    const { user, selectStore, activeStoreId } = useAuth(); 
+
     const [isEditing, setIsEditing] = useState(false);
     const [showAlert, setShowAlert] = useState(false);
 
-    const [nome, setNome] = useState(mockUsuarioLogado.nome);
-    const [email, setEmail] = useState(mockUsuarioLogado.email);
+    const [nome, setNome] = useState(user?.name || '');
+    const [email, setEmail] = useState(user?.email || '');
+
+    useEffect(() => {
+        if (user) {
+        setNome(user.name);
+        setEmail(user.email);
+        }
+    }, [user]);
 
     const [senhaAtual, setSenhaAtual] = useState('');
     const [novaSenha, setNovaSenha] = useState('');
     const [confirmaSenha, setConfirmaSenha] = useState('');
 
-    const [lojas] = useState<Loja[]>(mockLojasDoUsuario);
-    const [lojaSelecionadaId, setLojaSelecionadaId] = useState<string>('');
+    const lojasDoUsuario: Loja[] = useMemo(() => {
+        return user?.stores?.map((store: any) => ({
+        id: store.id,
+        nome: store.name || store.nome || 'Loja sem nome', 
+        cnpj: store.cnpj || 'CNPJ não informado',
+        endereco: store.address || store.endereco || 'Endereço não informado'
+        })) || [];
+  }, [user]);
+
+    const [lojaSelecionadaId, setLojaSelecionadaId] = useState<string>(activeStoreId || '');
     const [lojaSelecionada, setLojaSelecionada] = useState<Loja | null>(null);
 
-  
+    useEffect(() => {
+    if (activeStoreId && lojasDoUsuario.length > 0) {
+      if (lojaSelecionadaId !== activeStoreId) {
+        const loja = lojasDoUsuario.find(l => String(l.id) === String(activeStoreId));
+        if (loja) {
+          setLojaSelecionadaId(String(activeStoreId));
+          setLojaSelecionada(loja);
+        }
+      }
+    }
+  }, [activeStoreId, lojasDoUsuario, lojaSelecionadaId]);
+
     const handleCancel = () => {
-        setNome(mockUsuarioLogado.nome);
-        setEmail(mockUsuarioLogado.email);
+        setNome(user?.name || '');
+        setEmail(user?.email || '');
         setSenhaAtual('');
         setNovaSenha('');
         setConfirmaSenha('');
@@ -49,29 +66,30 @@ export function Perfil() {
         e.preventDefault();
 
         if (novaSenha && (novaSenha !== confirmaSenha)) {
-            alert("As novas senhas não coincidem!");
-            return;
+        alert("As novas senhas não coincidem!");
+        return;
         }
 
         console.log("Salvando dados...", { nome, email });
-        if (novaSenha) {
-            console.log("Alterando senha...");
-        }
-
+        
         setShowAlert(true);
         setIsEditing(false);
-    };
+  };
 
-    const handleLojaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const handleLojaChange = (e: ChangeEvent<HTMLSelectElement>) => {
         const id = e.target.value;
         setLojaSelecionadaId(id);
+        
         if (id) {
-            const lojaEncontrada = lojas.find(l => l.id === Number(id));
+            const lojaEncontrada = lojasDoUsuario.find(l => l.id === Number(id));
             setLojaSelecionada(lojaEncontrada || null);
         } else {
-            setLojaSelecionada(null);
+            setLojaSelecionada(null); 
         }
-    };
+
+        selectStore(id);
+  };
+
 
     return (
         <Container>
@@ -166,58 +184,67 @@ export function Perfil() {
                     </Card>
 
                     <Card className="shadow-sm">
-                        <Card.Header as="h5">
-                            Lojas Associadas
-                        </Card.Header>
-                        <Card.Body className="p-4">
-                            <Form.Group className="mb-3">
-                                <Form.Label>Selecionar Loja</Form.Label>
-                                <Form.Select
-                                    value={lojaSelecionadaId}
-                                    onChange={handleLojaChange}
-                                >
-                                    <option value="">Selecione uma loja...</option>
-                                    {lojas.map(loja => (
-                                        <option key={loja.id} value={loja.id}>
-                                            {loja.nome} (CNPJ: {loja.cnpj})
-                                        </option>
-                                    ))}
-                                </Form.Select>
-                            </Form.Group>
+            <Card.Header as="h5">
+              Lojas Associadas
+            </Card.Header>
+            <Card.Body className="p-4">
+              {lojasDoUsuario.length > 0 ? (
+                  <>
+                    <Form.Group className="mb-3">
+                        <Form.Label>Selecionar Loja</Form.Label>
+                        <Form.Select
+                        value={lojaSelecionadaId}
+                        onChange={handleLojaChange}
+                        >
+                        <option value="">Selecione uma loja...</option>
+                        {lojasDoUsuario.map(loja => (
+                            <option key={loja.id} value={loja.id}>
+                            {loja.nome} (CNPJ: {loja.cnpj})
+                            </option>
+                        ))}
+                        </Form.Select>
+                    </Form.Group>
 
-                            {lojaSelecionada && (
-                                <div className="p-3 border rounded">
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>Nome da Loja</Form.Label>
-                                        <Form.Control
-                                            type="text"
-                                            value={lojaSelecionada.nome}
-                                            readOnly
-                                            className="ps-2"
-                                        />
-                                    </Form.Group>
-                                    <Form.Group className="mb-3">
-                                        <Form.Label>CNPJ</Form.Label>
-                                        <Form.Control
-                                            type="text"
-                                            value={lojaSelecionada.cnpj}
-                                            readOnly
-                                            className="ps-2"
-                                        />
-                                    </Form.Group>
-                                    <Form.Group className="mb-0">
-                                        <Form.Label>Endereço</Form.Label>
-                                        <Form.Control
-                                            type="text"
-                                            value={lojaSelecionada.endereco}
-                                            readOnly
-                                            className="ps-2"
-                                        />
-                                    </Form.Group>
-                                </div>
-                            )}
-                        </Card.Body>
-                    </Card>
+                    {lojaSelecionada && (
+                        <div className="p-3 border rounded">
+                        <Form.Group className="mb-3">
+                            <Form.Label>Nome da Loja</Form.Label>
+                            <Form.Control
+                            type="text"
+                            value={lojaSelecionada.nome}
+                            readOnly
+                            className="ps-2"
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-3">
+                            <Form.Label>CNPJ</Form.Label>
+                            <Form.Control
+                            type="text"
+                            value={lojaSelecionada.cnpj}
+                            readOnly
+                            className="ps-2"
+                            />
+                        </Form.Group>
+                        <Form.Group className="mb-0">
+                            <Form.Label>Endereço</Form.Label>
+                            <Form.Control
+                            type="text"
+                            value={lojaSelecionada.endereco}
+                            readOnly
+                            className="ps-2"
+                            />
+                        </Form.Group>
+                        </div>
+                    )}
+                  </>
+              ) : (
+                  <Alert variant="info" className="m-0">
+                    <i className="bi bi-info-circle me-2"></i>
+                    Este usuário não possui lojas associadas.
+                  </Alert>
+              )}
+            </Card.Body>
+          </Card>
                 </Col>
             </Row>
         </Container>

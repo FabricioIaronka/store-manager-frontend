@@ -1,34 +1,45 @@
 import { useState } from 'react';
-import { Container, Table, Button, Modal, Form, Row, Col } from 'react-bootstrap';
+import { Container, Table, Button, Modal, Form, Row, Col, Spinner, Alert } from 'react-bootstrap';
+import { useProdutos, type Produto } from '../hooks/useProdutos';
 
-interface Produto {
-  id: number;
-  name: string;
-  qnt: number;
-  description: string | null;
-  price: number;
-  category: string | null;
-}
 
 const formatarMoeda = (valor: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor);
 };
 
 export function Produtos() {
-  const [produtos, setProdutos] = useState<Produto[]>([
-    { id: 1, name: 'Teclado Mecânico', qnt: 50, price: 150.99, description: 'Teclado com switches blue', category: 'Periféricos' },
-    { id: 2, name: 'Mouse Gamer', qnt: 100, price: 80.50, description: 'Mouse com 8000 DPI', category: 'Periféricos' },
-    { id: 3, name: 'Monitor 24"', qnt: 20, price: 800.00, description: null, category: 'Monitores' }
-  ]);
+  const { 
+    produtos, 
+    isLoading, 
+    isError, 
+    createProduto, 
+    updateProduto, 
+    deleteProduto 
+  } = useProdutos();
 
   const [showModal, setShowModal] = useState(false);
   const [editandoId, setEditandoId] = useState<number | null>(null);
+
+  const [mensagemSucesso, setMensagemSucesso] = useState('');
+  const [mensagemErro, setMensagemErro] = useState('');
+  const [modalErro, setModalErro] = useState('');
 
   const [name, setName] = useState('');
   const [qnt, setQnt] = useState(0);
   const [price, setPrice] = useState(0);
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
+
+  const exibirSucesso = (msg: string) => {
+    setMensagemSucesso(msg);
+    setTimeout(() => setMensagemSucesso(''), 3000); 
+  };
+
+  const exibirErro = (msg: string) => {
+    setMensagemErro(msg);
+    setTimeout(() => setMensagemErro(''), 4000);
+  };
+
 
   const handleClose = () => {
     setShowModal(false);
@@ -44,30 +55,52 @@ export function Produtos() {
     setCategory('');
     setDescription('');
     setEditandoId(null);
+    setModalErro('');
   };
 
   const handleSalvar = () => {
-    if (!name || price <= 0) {
-      alert("Preencha pelo menos Nome e Preço.");
+    // Validação de UI
+    if (!name || name.length < 3) {
+      setModalErro("O nome deve ter pelo menos 3 caracteres.");
       return;
     }
+    if (price <= 0) {
+      setModalErro("O preço deve ser maior que zero.");
+      return;
+    }
+    setModalErro('');
+
+    const payload = {
+      name,
+      qnt,
+      price,
+      category: category || null,
+      description: description || null
+    };
 
     if (editandoId) {
-      setProdutos(produtos.map(p =>
-        p.id === editandoId ? { ...p, name, qnt, price, category, description } : p
-      ));
+      updateProduto.mutate({ id: editandoId, produto: payload }, {
+        onSuccess: () => {
+          handleClose();
+          exibirSucesso('Produto atualizado com sucesso!');
+        },
+        onError: (error: any) => {
+          const msg = error.response?.data?.detail || 'Erro ao atualizar produto.';
+          setModalErro(Array.isArray(msg) ? msg[0].msg : msg);
+        }
+      });
     } else {
-      const novoId = Math.max(...produtos.map(p => p.id), 0) + 1;
-      setProdutos([...produtos, { 
-        id: novoId, 
-        name, 
-        qnt, 
-        price, 
-        category: category || null, 
-        description: description || null 
-      }]);
+      createProduto.mutate(payload, {
+        onSuccess: () => {
+          handleClose();
+          exibirSucesso('Produto criado com sucesso!');
+        },
+        onError: (error: any) => {
+          const msg = error.response?.data?.detail || 'Erro ao criar produto.';
+          setModalErro(Array.isArray(msg) ? msg[0].msg : msg);
+        }
+      });
     }
-    handleClose();
   };
 
   const handleEditar = (produto: Produto) => {
@@ -81,12 +114,58 @@ export function Produtos() {
   };
 
   const handleExcluir = (id: number) => {
-    console.log('Excluir produto ' + id);
-    setProdutos(produtos.filter(p => p.id !== id));
+    if (confirm('Tem certeza que deseja excluir este produto?')) {
+      deleteProduto.mutate(id, {
+        onSuccess: () => exibirSucesso('Produto excluído com sucesso!'),
+        onError: () => exibirErro('Erro ao excluir produto.')
+      });
+    }
   };
+  
+  if (isLoading) {
+    return (
+      <Container className="text-center mt-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2">Carregando produtos...</p>
+      </Container>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Container className="mt-5">
+        <Alert variant="danger">
+          Erro ao carregar produtos. Verifique se o backend está rodando.
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container>
+      <div 
+        className="position-fixed start-50 translate-middle-x" 
+        style={{ 
+            zIndex: 1050, 
+            top: '80px',
+            width: '90%', 
+            maxWidth: '600px'
+        }}
+      >
+        {mensagemSucesso && (
+           <Alert variant="success" onClose={() => setMensagemSucesso('')} dismissible className="text-center shadow-lg">
+             <i className="bi bi-check-circle-fill me-2"></i>
+             {mensagemSucesso}
+           </Alert>
+        )}
+        {mensagemErro && (
+           <Alert variant="danger" onClose={() => setMensagemErro('')} dismissible className="text-center shadow-lg">
+             <i className="bi bi-exclamation-triangle-fill me-2"></i>
+             {mensagemErro}
+           </Alert>
+        )}
+      </div>
+
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Estoque de Produtos</h2>
         <Button variant="primary" onClick={handleShow}>
@@ -107,32 +186,40 @@ export function Produtos() {
           </tr>
         </thead>
         <tbody>
-          {produtos.map((produto) => (
-            <tr key={produto.id}>
-              <td>{produto.id}</td>
-              <td>{produto.name}</td>
-              <td>{produto.category || 'N/A'}</td>
-              <td className="text-end">{formatarMoeda(produto.price)}</td>
-              <td className="text-center">{produto.qnt}</td>
-              <td className="text-center">
-                <Button
-                  variant="warning"
-                  size="sm"
-                  className="me-2"
-                  onClick={() => handleEditar(produto)}
-                >
-                  <i className="bi bi-pencil"></i>
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => handleExcluir(produto.id)}
-                >
-                  <i className="bi bi-trash"></i>
-                </Button>
+          {produtos.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="text-center text-muted">
+                Nenhum produto cadastrado.
               </td>
             </tr>
-          ))}
+          ) : (
+            produtos.map((produto: Produto) => (
+              <tr key={produto.id}>
+                <td>{produto.id}</td>
+                <td>{produto.name}</td>
+                <td>{produto.category || 'N/A'}</td>
+                <td className="text-end">{formatarMoeda(produto.price)}</td>
+                <td className="text-center">{produto.qnt}</td>
+                <td className="text-center">
+                  <Button
+                    variant="warning"
+                    size="sm"
+                    className="me-2"
+                    onClick={() => handleEditar(produto)}
+                  >
+                    <i className="bi bi-pencil"></i>
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleExcluir(produto.id)}
+                  >
+                    <i className="bi bi-trash"></i>
+                  </Button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </Table>
 
@@ -141,6 +228,13 @@ export function Produtos() {
           <Modal.Title>{editandoId ? 'Editar Produto' : 'Novo Produto'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          {modalErro && (
+            <Alert variant="danger" onClose={() => setModalErro('')} dismissible>
+              <i className="bi bi-exclamation-circle-fill me-2"></i>
+              {modalErro}
+            </Alert>
+          )}
+
           <Form>
             <Form.Group className="mb-3">
               <Form.Label>Nome do Produto</Form.Label>

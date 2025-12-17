@@ -1,31 +1,40 @@
 import { useState } from 'react';
-import { Container, Table, Button, Modal, Form, Row, Col } from 'react-bootstrap';
+import { Container, Table, Button, Modal, Form, Row, Col, Alert, Spinner } from 'react-bootstrap';
+import { useClientes, type Cliente } from '../hooks/useClientes';
 
-interface Cliente {
-  id: number;
-  nome: string;
-  sobrenome: string;
-  numero:string;
-  email: string;
-  cpf: string;
-}
 
 export function Clientes() {
-  const [clientes, setClientes] = useState<Cliente[]>([
-    { id: 1, nome: 'João', sobrenome:'da Silva', numero:'999112233', email: 'joao@gmail.com', cpf: '111.222.333-44' },
-    { id: 2, nome: 'Maria', sobrenome:' Souza', numero:'999112233', email: 'maria@hotmail.com', cpf: '555.666.777-88' },
-    { id: 3, nome: 'Pedro', sobrenome:' Cabral', numero:'999112233', email: 'maria@hotmail.com', cpf: '555.666.777-88' },
-    { id: 4, nome: 'Michael', sobrenome:' Jordan', numero:'999112233', email: 'maria@hotmail.com', cpf: '555.666.777-88' },
-  ]);
+  const { 
+    clientes, 
+    isLoading, 
+    isError, 
+    createCliente, 
+    updateCliente, 
+    deleteCliente 
+  } = useClientes();
 
   const [showModal, setShowModal] = useState(false);
   const [editandoId, setEditandoId] = useState<number | null>(null);
-  
-  const [nome, setNome] = useState('');
-  const [sobrenome, setSobrenome] = useState('');
-  const [numero, setNumero] = useState('');
+
+  const [mensagemSucesso, setMensagemSucesso] = useState('');
+  const [mensagemErro, setMensagemErro] = useState('');
+  const [modalErro, setModalErro] = useState('');
+
+  const [name, setName] = useState('');
+  const [surname, setSurname] = useState('');
+  const [number, setNumber] = useState('');
   const [email, setEmail] = useState('');
   const [cpf, setCpf] = useState('');
+
+  const exibirSucesso = (msg: string) => {
+    setMensagemSucesso(msg);
+    setTimeout(() => setMensagemSucesso(''), 3000);
+  };
+
+  const exibirErro = (msg: string) => {
+    setMensagemErro(msg);
+    setTimeout(() => setMensagemErro(''), 4000);
+  };
 
   const handleClose = () => {
     setShowModal(false);
@@ -35,31 +44,60 @@ export function Clientes() {
   const handleShow = () => setShowModal(true);
 
   const limparForm = () => {
-    setNome('');
-    setSobrenome('');
-    setNumero('');
+    setName('');
+    setSurname('');
+    setNumber('');
     setEmail('');
     setCpf('');
     setEditandoId(null);
+    setModalErro('');
   };
 
   const handleSalvar = () => {
-    if (editandoId) {
-      setClientes(clientes.map(c => 
-        c.id === editandoId ? { ...c, nome, sobrenome, numero, email, cpf } : c
-      ));
-    } else {
-      const novoId = Math.max(...clientes.map(c => c.id), 0) + 1;
-      setClientes([...clientes, { id: novoId, nome, sobrenome, numero, email, cpf }]);
+    if (!name || !surname || !cpf) {
+      setModalErro("Preencha pelo menos Nome, Sobrenome e CPF.");
+      return;
     }
-    handleClose();
+    setModalErro('');
+
+    const payload = {
+      name,
+      surname,
+      number,
+      email,
+      cpf
+    };
+
+    if (editandoId) {
+      updateCliente.mutate({ id: editandoId, cliente: payload }, {
+        onSuccess: () => {
+          handleClose();
+          exibirSucesso('Cliente atualizado com sucesso!');
+        },
+        onError: (error: any) => {
+          const msg = error.response?.data?.detail || 'Erro ao atualizar cliente.';
+          setModalErro(Array.isArray(msg) ? msg[0].msg : msg);
+        }
+      });
+    } else {
+      createCliente.mutate(payload, {
+        onSuccess: () => {
+          handleClose();
+          exibirSucesso('Cliente cadastrado com sucesso!');
+        },
+        onError: (error: any) => {
+          const msg = error.response?.data?.detail || 'Erro ao cadastrar cliente.';
+          setModalErro(Array.isArray(msg) ? msg[0].msg : msg);
+        }
+      });
+    }
   };
 
   const handleEditar = (cliente: Cliente) => {
     setEditandoId(cliente.id);
-    setNome(cliente.nome);
-    setSobrenome(cliente.sobrenome);
-    setNumero(cliente.numero);
+    setName(cliente.name);
+    setSurname(cliente.surname);
+    setNumber(cliente.number);
     setEmail(cliente.email);
     setCpf(cliente.cpf);
     handleShow();
@@ -67,12 +105,52 @@ export function Clientes() {
 
   const handleExcluir = (id: number) => {
     if (confirm('Tem certeza que deseja excluir este cliente?')) {
-      setClientes(clientes.filter(c => c.id !== id));
+      deleteCliente.mutate(id, {
+        onSuccess: () => exibirSucesso('Cliente removido com sucesso!'),
+        onError: () => exibirErro('Erro ao remover cliente.')
+      });
     }
   };
 
+  if (isLoading) {
+    return (
+      <Container className="text-center mt-5">
+        <Spinner animation="border" variant="primary" />
+        <p className="mt-2">Carregando clientes...</p>
+      </Container>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Container className="mt-5">
+        <Alert variant="danger">
+          Erro ao carregar clientes. Verifique a conexão com o servidor.
+        </Alert>
+      </Container>
+    );
+  }
+
   return (
     <Container>
+      <div
+        className="position-fixed start-50 translate-middle-x"
+        style={{ zIndex: 1050, top: '80px', width: '90%', maxWidth: '600px' }}
+      >
+        {mensagemSucesso && (
+          <Alert variant="success" onClose={() => setMensagemSucesso('')} dismissible className="text-center shadow-lg">
+            <i className="bi bi-check-circle-fill me-2"></i>
+            {mensagemSucesso}
+          </Alert>
+        )}
+        {mensagemErro && (
+          <Alert variant="danger" onClose={() => setMensagemErro('')} dismissible className="text-center shadow-lg">
+            <i className="bi bi-exclamation-triangle-fill me-2"></i>
+            {mensagemErro}
+          </Alert>
+        )}
+      </div>
+
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Gerenciar Clientes</h2>
         <Button variant="primary" onClick={handleShow}>
@@ -93,32 +171,40 @@ export function Clientes() {
           </tr>
         </thead>
         <tbody>
-          {clientes.map((cliente) => (
-            <tr key={cliente.id}>
-              <td>{cliente.id}</td>
-              <td>{cliente.nome} {cliente.sobrenome}</td>
-              <td>{cliente.numero}</td>
-              <td>{cliente.cpf}</td>
-              <td>{cliente.email}</td>
-              <td className="text-center">
-                <Button 
-                  variant="warning" 
-                  size="sm" 
-                  className="me-2"
-                  onClick={() => handleEditar(cliente)}
-                >
-                  <i className="bi bi-pencil"></i>
-                </Button>
-                <Button 
-                  variant="danger" 
-                  size="sm"
-                  onClick={() => handleExcluir(cliente.id)}
-                >
-                  <i className="bi bi-trash"></i>
-                </Button>
+          {clientes.length === 0 ? (
+            <tr>
+              <td colSpan={6} className="text-center text-muted">
+                Nenhum cliente cadastrado.
               </td>
             </tr>
-          ))}
+          ) : (
+            clientes.map((cliente: Cliente) => (
+              <tr key={cliente.id}>
+                <td>{cliente.id}</td>
+                <td>{cliente.name} {cliente.surname}</td>
+                <td>{cliente.number}</td>
+                <td>{cliente.cpf}</td>
+                <td>{cliente.email}</td>
+                <td className="text-center">
+                  <Button 
+                    variant="warning" 
+                    size="sm" 
+                    className="me-2"
+                    onClick={() => handleEditar(cliente)}
+                  >
+                    <i className="bi bi-pencil"></i>
+                  </Button>
+                  <Button 
+                    variant="danger" 
+                    size="sm"
+                    onClick={() => handleExcluir(cliente.id)}
+                  >
+                    <i className="bi bi-trash"></i>
+                  </Button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </Table>
 
@@ -127,16 +213,23 @@ export function Clientes() {
           <Modal.Title>{editandoId ? 'Editar Cliente' : 'Novo Cliente'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
+          {modalErro && (
+            <Alert variant="danger" onClose={() => setModalErro('')} dismissible>
+              <i className="bi bi-exclamation-circle-fill me-2"></i>
+              {modalErro}
+            </Alert>
+          )}
+
           <Form>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Nome</Form.Label>
-                  <Form.Control 
-                    type="text" 
-                    placeholder="Ex: João" 
-                    value={nome}
-                    onChange={e => setNome(e.target.value)}
+                  <Form.Control
+                    type="text"
+                    placeholder="Ex: João"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
                     autoFocus
                   />
                 </Form.Group>
@@ -144,11 +237,11 @@ export function Clientes() {
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Sobrenome</Form.Label>
-                  <Form.Control 
-                    type="text" 
-                    placeholder="Ex: da Silva" 
-                    value={sobrenome}
-                    onChange={e => setSobrenome(e.target.value)}
+                  <Form.Control
+                    type="text"
+                    placeholder="Ex: da Silva"
+                    value={surname}
+                    onChange={e => setSurname(e.target.value)}
                   />
                 </Form.Group>
               </Col>
@@ -158,22 +251,22 @@ export function Clientes() {
               <Col md={7}>
                 <Form.Group className="mb-3">
                   <Form.Label>CPF</Form.Label>
-                  <Form.Control 
-                    type="text" 
-                    placeholder="000.000.000-00" 
+                  <Form.Control
+                    type="text"
+                    placeholder="000.000.000-00"
                     value={cpf}
                     onChange={e => setCpf(e.target.value)}
                   />
                 </Form.Group>
               </Col>
               <Col md={5}>
-                 <Form.Group className="mb-3">
+                <Form.Group className="mb-3">
                   <Form.Label>Telefone</Form.Label>
-                  <Form.Control 
-                    type="text" 
-                    placeholder="(00) 00000-0000" 
-                    value={numero}
-                    onChange={e => setNumero(e.target.value)}
+                  <Form.Control
+                    type="text"
+                    placeholder="(00) 00000-0000"
+                    value={number}
+                    onChange={e => setNumber(e.target.value)}
                   />
                 </Form.Group>
               </Col>
@@ -181,9 +274,9 @@ export function Clientes() {
 
             <Form.Group className="mb-3">
               <Form.Label>E-mail</Form.Label>
-              <Form.Control 
-                type="email" 
-                placeholder="nome@email.com" 
+              <Form.Control
+                type="email"
+                placeholder="nome@email.com"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
@@ -194,8 +287,12 @@ export function Clientes() {
           <Button variant="secondary" onClick={handleClose}>
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleSalvar}>
-            Salvar
+          <Button 
+            variant="primary" 
+            onClick={handleSalvar}
+            disabled={createCliente.isPending || updateCliente.isPending}
+          >
+            {createCliente.isPending || updateCliente.isPending ? 'Salvando...' : 'Salvar'}
           </Button>
         </Modal.Footer>
       </Modal>
