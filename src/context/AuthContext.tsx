@@ -14,7 +14,7 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   activeStoreId: string | null;
-  signIn: (email: string, pass: string) => Promise<void>;
+  signIn: (email: string, pass: string) => Promise<User>;
   signOut: () => void;
   selectStore: (storeId: string) => void;
   refreshUser: () => Promise<void>;
@@ -56,7 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const userData = await fetchUser();
       
-      // Se tiver lojas e nenhuma selecionada, seleciona a primeira
       if (userData.stores && userData.stores.length > 0 && !localStorage.getItem('active_store_id')) {
          const firstStoreId = String(userData.stores[0].id);
          localStorage.setItem('active_store_id', firstStoreId);
