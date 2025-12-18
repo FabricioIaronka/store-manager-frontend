@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, HashRouter } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import { PrivateRoute } from './components/PrivateRoute';
 
@@ -41,11 +41,11 @@ function Layout() {
 
 function App() {
   return (
-    <BrowserRouter>
+    <HashRouter>
     <AuthProvider>
       <Layout />
     </AuthProvider>
-    </BrowserRouter>
+    </HashRouter>
   );
 }
 
