@@ -28,13 +28,17 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    const isLoginRequest = error.config.url.includes('/auth/login');
+    if (error.response && error.response.status === 401) {
+      const isLoginRequest = error.config.url.includes('/auth/login');
+      const isCheckAuth = error.config.url.includes('/auth/me');
 
-      if (!isLoginRequest) {
-        localStorage.removeItem('store_token');
+      if (!isLoginRequest && !isCheckAuth) {
+        localStorage.removeItem('store_token'); 
         localStorage.removeItem('store_user');
+        
         window.location.href = '/'; 
       }
+    }
     return Promise.reject(error);
   }
 );
