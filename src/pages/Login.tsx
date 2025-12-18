@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert } from 'react-bootstrap';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export function Login() {
@@ -31,9 +31,13 @@ export function Login() {
     setCarregando(true);
 
     try {
-      await signIn(email, senha);
+      const user = await signIn(email, senha);
       
-      navigate('/dashboard');
+      if (user.stores && user.stores.length > 0) {
+        navigate('/dashboard');
+      } else {
+        navigate('/create-store');
+      }
     } catch (error) {
       console.error(error);
       setErro('E-mail ou senha inválidos.');
@@ -91,10 +95,11 @@ export function Login() {
                 {carregando ? 'Entrando...' : 'Entrar'}
               </Button>
 
-              <div className="text-center">
-                <a href="#" className="text-decoration-none text-muted small">
-                  Esqueceu sua senha?
-                </a>
+              <div className="text-center mt-3">
+                <span className="text-muted small">Não tem conta? </span>
+                <Link to="/register" className="text-decoration-none small fw-bold">
+                  Registre-se
+                </Link>
               </div>
             </Form>
           </Card.Body>

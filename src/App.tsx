@@ -3,6 +3,7 @@ import { AuthProvider } from './context/AuthContext';
 import { PrivateRoute } from './components/PrivateRoute';
 
 import { MainNavbar } from './components/MainNavBar';
+import { CreateStore } from './pages/CreateStore';
 import { Dashboard } from './pages/Dashboard';
 import { Produtos } from './pages/Produtos';
 import { Clientes } from './pages/Clientes';
@@ -10,11 +11,12 @@ import { HistoricoVendas } from './pages/HistoricoVendas';
 import { Vendas } from './pages/Vendas';
 import { Login } from './pages/Login';
 import { Perfil } from './pages/Perfil';
+import { Register } from './pages/Resgistro';
 
 function Layout() {
   const location = useLocation();
   
-  const hideNavbarRoutes = ['/'];
+  const hideNavbarRoutes = ['/', '/register'];
 
   const showNavbar = !hideNavbarRoutes.includes(location.pathname);
 
@@ -24,8 +26,10 @@ function Layout() {
       
       <Routes>
         <Route path="/" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
         <Route element={<PrivateRoute />}>
+          <Route path="/create-store" element={<CreateStore />} /> 
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/produtos" element={<Produtos />} />
           <Route path="/clientes" element={<Clientes />} />

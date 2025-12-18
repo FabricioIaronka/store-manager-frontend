@@ -17,6 +17,7 @@ interface AuthContextType {
   signIn: (email: string, pass: string) => Promise<void>;
   signOut: () => void;
   selectStore: (storeId: string) => void;
+  refreshUser: () => Promise<void>;
   loading: boolean;
 }
 
@@ -26,6 +27,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [activeStoreId, setActiveStoreId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const fetchUser = async () => {
+    const { data } = await api.get('/auth/me');
+    setUser(data);
+    return data;
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -45,6 +52,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     checkAuth();
   }, []);
 
+   const refreshUser = useCallback(async () => {
+    try {
+      const userData = await fetchUser();
+      
+      // Se tiver lojas e nenhuma selecionada, seleciona a primeira
+      if (userData.stores && userData.stores.length > 0 && !localStorage.getItem('active_store_id')) {
+         const firstStoreId = String(userData.stores[0].id);
+         localStorage.setItem('active_store_id', firstStoreId);
+         setActiveStoreId(firstStoreId);
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar usuário", error);
+    }
+  }, []);
+
   const signIn = useCallback(async (email: string, pass: string) => {
     const formData = new URLSearchParams();
     formData.append('username', email); 
@@ -54,16 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     });
 
-    const userResponse = await api.get('/auth/me');
-    const userData = userResponse.data;
-
-    setUser(userData);
+    const userData = await fetchUser();
     
     if (userData.stores && userData.stores.length > 0) {
         const firstStoreId = String(userData.stores[0].id);
         localStorage.setItem('active_store_id', firstStoreId);
         setActiveStoreId(firstStoreId);
     }
+
+    return userData;
   }, []);
 
   const signOut = useCallback(async () => {
@@ -89,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, activeStoreId, signIn, signOut, selectStore, loading }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, activeStoreId, signIn, signOut, selectStore, refreshUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
